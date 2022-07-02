@@ -63,7 +63,7 @@ impl ModuleData {
 
 #[no_mangle]
 pub extern "C" fn cranelift_module_new(
-    target_triple: *const c_char,
+    target: *const c_char,
     flags: *const c_char,
     name: *const c_char,
     userdata: usize,
@@ -71,11 +71,9 @@ pub extern "C" fn cranelift_module_new(
     message_cb: Option<fn(userdata: usize, *const c_char, *const c_char) -> ()>,
 ) -> *mut ModuleData {
     let mut flag_builder = settings::builder();
-    let trip: &str = unsafe { CStr::from_ptr(target_triple) }.to_str().unwrap();
     let flag: &str = unsafe { CStr::from_ptr(flags) }.to_str().unwrap();
-    let name_str: &str = unsafe { CStr::from_ptr(name) }.to_str().unwrap();
-    let triple = triple!(trip);
-    let isa_builder = isa::lookup(triple).unwrap();
+    let name_str: &str = unsafe { CStr::from_ptr(target) }.to_str().unwrap();
+    let isa_builder = isa::lookup_by_name(name_str).unwrap();
 
     for s in flag.split(',') {
         if !s.is_empty() {
@@ -211,7 +209,7 @@ pub extern "C" fn cranelift_declare_function(
     let intid = inst.module.as_mut().unwrap().declare_function(
         real_name,
         convert_linkage(linkage),
-        &mut inst.ctx.func.signature,
+        &inst.ctx.func.signature,
     );
 
     if intid.is_err() {
@@ -295,7 +293,6 @@ pub extern "C" fn cranelift_write_function_in_data(
     target_id: u32,
     _offset: u32,
     source_id: u32,
-    data_ctx: &mut DataContext,
 ) {
     let inst = unsafe {
         assert!(!ptr.is_null());
@@ -309,7 +306,7 @@ pub extern "C" fn cranelift_write_function_in_data(
     inst.module
         .as_mut()
         .unwrap()
-        .declare_func_in_data(FuncId::from_u32(target_id), data_ctx);
+        .declare_func_in_data(FuncId::from_u32(target_id), &mut inst.data_ctx);
 }
 
 #[no_mangle]
